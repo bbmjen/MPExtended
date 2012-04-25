@@ -158,5 +158,22 @@ namespace MPExtended.Libraries.Service.Util
                 return false;
             }
         }
+
+        public static string ReadPropertyFromConfigFile(string mpPath)
+        {
+            String[] keys = mpPath.Trim(new char[]{' ', '%'}).Split(new char[]{'-'}, StringSplitOptions.RemoveEmptyEntries);
+            if (keys != null && keys.Length == 3)
+            {
+                if (keys[0].ToLower().Equals("mp"))
+                {
+                    Dictionary<String, String> musicConfig = Mediaportal.ReadSectionFromConfigFile(keys[1]);
+                    if (musicConfig.ContainsKey(keys[2]))
+                    {
+                        return musicConfig[keys[2]];
+                    }
+                }
+            }
+            return null;
+        }
     }
 }

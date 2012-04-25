@@ -40,6 +40,7 @@ namespace MPExtended.PlugIns.MAS.MPMusic
     {
         private Dictionary<string, string> configuration;
         public bool Supported { get; set; }
+        public String defaultPlaylistPath = null;
 
         [ImportingConstructor]
         public MPMusic(IPluginData data)
@@ -55,7 +56,7 @@ namespace MPExtended.PlugIns.MAS.MPMusic
             Dictionary<string, WebMusicArtistBasic> artists = GetAllArtists().ToDictionary(x => x.Id, x => x);
 
             string sql = "SELECT idTrack, strAlbumArtist, strAlbum, strArtist, iTrack, strTitle, strPath, iDuration, iYear, strGenre, iRating " +
-                         "FROM tracks t " + 
+                         "FROM tracks t " +
                          "WHERE %where";
             return new LazyQuery<T>(this, sql, new List<SQLFieldMapping>() {
                 new SQLFieldMapping("t", "idTrack", "Id", DataReaders.ReadIntAsString),
@@ -110,10 +111,10 @@ namespace MPExtended.PlugIns.MAS.MPMusic
                             "GROUP_CONCAT(t.strArtist, '|') AS artists, GROUP_CONCAT(t.strGenre, '|') AS genre, GROUP_CONCAT(t.strComposer, '|') AS composer, " +
                             "MIN(t.dateAdded) AS date, " +
                             "CASE WHEN i.iYear ISNULL THEN MIN(t.iYear) ELSE i.iYear END AS year, " +
-                            "MAX(i.iRating) AS rating " + 
+                            "MAX(i.iRating) AS rating " +
                          "FROM tracks t " +
                          "LEFT JOIN albuminfo i ON t.strAlbum = i.strAlbum AND t.strArtist LIKE '%' || i.strArtist || '%' " +
-                         "WHERE %where " + 
+                         "WHERE %where " +
                          "GROUP BY t.strAlbum, t.strAlbumArtist ";
             return new LazyQuery<WebMusicAlbumBasic>(this, sql, new List<SQLFieldMapping>()
             {
@@ -130,7 +131,7 @@ namespace MPExtended.PlugIns.MAS.MPMusic
                 new SQLFieldMapping("", "rating", "Rating", DataReaders.ReadInt32),
             }, delegate(WebMusicAlbumBasic album)
             {
-                if(album.Artists.Count() > 0) 
+                if (album.Artists.Count() > 0)
                 {
                     int i = 0;
                     string[] filenames = new string[] {
@@ -469,7 +470,7 @@ namespace MPExtended.PlugIns.MAS.MPMusic
 
             String[] playlists = Directory.GetFiles(path);
 
-            foreach(String p in playlists)
+            foreach (String p in playlists)
             {
                 if (PlayListFactory.IsPlayList(p))
                 {
@@ -513,7 +514,7 @@ namespace MPExtended.PlugIns.MAS.MPMusic
             if (success)
             {
                 List<WebPlaylistItem> retList = new List<WebPlaylistItem>();
-                foreach(PlayListItem i in mpPlaylist)
+                foreach (PlayListItem i in mpPlaylist)
                 {
                     WebPlaylistItem webItem = new WebPlaylistItem();
                     WebMusicTrackBasic track = GetMusicTrack(i.FileName);
@@ -557,7 +558,7 @@ namespace MPExtended.PlugIns.MAS.MPMusic
             PlayList mpPlaylist = new PlayList();
             IPlayListIO factory = PlayListFactory.CreateIO(path);
 
-            foreach(WebPlaylistItem i in playlistItems)
+            foreach (WebPlaylistItem i in playlistItems)
             {
                 PlayListItem mpItem = new PlayListItem(i.Title, i.Path[0], i.Duration);
                 mpItem.Type = PlayListItem.PlayListItemType.Audio;
@@ -569,6 +570,25 @@ namespace MPExtended.PlugIns.MAS.MPMusic
         private string GetPlaylistPath()
         {
             String playlistPath = configuration["playlist"];
+
+            if (playlistPath.Contains("%mp"))
+            {
+                if (defaultPlaylistPath == null)
+                {
+                    String mpPath = playlistPath.Substring(playlistPath.IndexOf("%mp"));
+                    mpPath = playlistPath.Substring(0, playlistPath.IndexOf("%", 1) + 1);
+                    String mpPlaylist = Mediaportal.ReadPropertyFromConfigFile(mpPath);
+                    if (mpPlaylist != null)
+                    {
+                        playlistPath = mpPlaylist;
+                    }
+                    else
+                    {
+                        Log.Warn("Couldn't map " + playlistPath + " to MediaPortal property");
+                    }
+                }
+                playlistPath = defaultPlaylistPath;
+            }
 
             return playlistPath;
         }
@@ -586,7 +606,7 @@ namespace MPExtended.PlugIns.MAS.MPMusic
                 File.Create(Path.Combine(path, fileName));
                 return EncodeTo64(fileName);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Log.Error("Unable to create playlist " + playlistName, ex);
             }
